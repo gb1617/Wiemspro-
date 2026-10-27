@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Wiemspro BLE Test Controller</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 20px; background: #0f172a; color: #f8fafc; max-width: 500px; margin: auto; }
+    .card { background: #1e293b; padding: 18px; border-radius: 12px; margin-bottom: 16px; border: 1px solid #334155; }
+    h2 { margin-top: 0; font-size: 1.1rem; color: #38bdf8; }
+    button { width: 100%; padding: 14px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 1rem; margin-bottom: 8px; }
+    .btn-connect { background: #2563eb; color: white; }
+    .btn-start { background: #16a34a; color: white; }
+    .btn-stop { background: #dc2626; color: white; font-size: 1.2rem; }
+    .status { font-weight: bold; padding: 8px; border-radius: 6px; background: #0f172a; text-align: center; font-size: 0.9rem; }
+    label { display: block; margin-top: 12px; margin-bottom: 4px; font-size: 0.85rem; color: #94a3b8; }
+    input[type=range] { width: 100%; }
+    .val-display { float: right; color: #f8fafc; font-weight: bold; }
+  </style>
+</head>
+<body>
+
+  <h1>Wiemspro Controller Test</h1>
+
+  <div class="card">
+    <h2>Liaison Bluetooth</h2>
+    <button class="btn-connect" id="connectBtn">Rechercher et connecter le boîtier</button>
+    <div class="status" id="statusLabel">Statut : Déconnecté</div>
+  </div>
+
+  <div class="card">
+    <h2>Paramètres</h2>
+    <label>Fréquence globale (Hz) <span class="val-display" id="freqVal">50</span></label>
+    <input type="range" id="freqInput" min="5" max="100" value="50">
+
+    <label>Intensité Canal 1 (%) <span class="val-display" id="powerVal">0</span></label>
+    <input type="range" id="powerInput" min="0" max="30" value="0">
+  </div>
+
+  <div class="card">
+    <button class="btn-start" id="startBtn" disabled>START STIMULATION</button>
+    <button class="btn-stop" id="stopBtn" disabled>STOP D'URGENCE (0x00)</button>
+  </div>
+
+  <script>
+    // UUIDs issus des relevés nRF Connect
+    const SERVICE_UUID = "7764d8fe-c6a9-11e4-8731-1681e6b88ec1";
+    const CHAR_FREQUENCY_UUID = "7764e8bc-c6a9-11e4-8731-1681e6b88ec1";
+    const CHAR_POWER_UUID     = "966e06c6-c717-11e4-8731-1681e6b88ec1";
+    const CHAR_STARTSTOP_UUID = "7764eda8-c6a9-11e4-8731-1681e6b88ec1";
+
+    let device, server;
+    let charFreq, charPower, charStartStop;
+
+    const statusLabel = document.getElementById('statusLabel');
+    const connectBtn = document.getElementById('connectBtn');
+    const startBtn = document.getElementById('startBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    const freqInput = document.getElementById('freqInput');
+    const powerInput = document.getElementById('powerInput');
+
+    freqInput.oninput = () => document.getElementById('freqVal').textContent = freqInput.value;
+    powerInput.oninput = () => document.getElementById('powerVal').textContent = powerInput.value;
+
+    connectBtn.onclick = async () => {
+      try {
+        statusLabel.textContent = "Recherche en cours...";
+        device = await navigator.bluetooth.requestDevice({
+          filters: [{ namePrefix: "WIEMS" }],
+          optionalServices: [SERVICE_UUID]
+        });
+
+        device.addEventListener('gattserverdisconnected', onDisconnected);
+
+        statusLabel.textContent = "Connexion au serveur GATT...";
+        server = await device.gatt.connect();
+
+        statusLabel.textContent = "Récupération des services...";
+        const service = await server.getPrimaryService(SERVICE_UUID);
+
+        charFreq = await service.getCharacteristic(CHAR_FREQUENCY_UUID);
+        charPower = await service.getCharacteristic(CHAR_POWER_UUID);
+        charStartStop = await service.getCharacteristic(CHAR_STARTSTOP_UUID);
+
+        statusLabel.textContent = "Connecté : " + device.name;
+        statusLabel.style.color = "#4ade80";
+        startBtn.disabled = false;
+        stopBtn.disabled = false;
+        connectBtn.disabled = true;
+
+      } catch (error) {
+        console.error(error);
+        statusLabel.textContent = "Erreur : " + error.message;
+        statusLabel.style.color = "#f87171";
+      }
+    };
+
+    function onDisconnected() {
+      statusLabel.textContent = "Périphérique déconnecté";
+      statusLabel.style.color = "#f87171";
+      startBtn.disabled = true;
+      stopBtn.disabled = true;
+      connectBtn.disabled = false;
+    }
+
+    startBtn.onclick = async () => {
+      try {
+        const freq = parseInt(freqInput.value, 10);
+        const pwr = parseInt(powerInput.value, 10);
+
+        // Préparation du buffer Fréquence (10 octets)
+        const freqBuffer = new Uint8Array([freq, freq, freq, freq, freq, freq, freq, freq, freq, freq]);
+        await charFreq.writeValue(freqBuffer);
+
+        // Préparation du buffer Intensité (Canal 1 actif, autres à 0)
+        const powerBuffer = new Uint8Array([pwr, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+        await charPower.writeValue(powerBuffer);
+
+        // Ordre Start (0x01)
+        const startBuffer = new Uint8Array([0x01]);
+        await charStartStop.writeValue(startBuffer);
+
+        statusLabel.textContent = `En émission (Freq: ${freq}Hz, Ch1: ${pwr}%)`;
+      } catch (err) {
+        console.error(err);
+        statusLabel.textContent = "Erreur écriture : " + err.message;
+      }
+    };
+
+    stopBtn.onclick = async () => {
+      try {
+        // Envoi Stop (0x00)
+        const stopBuffer = new Uint8Array([0x00]);
+        await charStartStop.writeValue(stopBuffer);
+
+        // Remise à zéro des puissances
+        const zeroPower = new Uint8Array(10);
+        await charPower.writeValue(zeroPower);
+
+        statusLabel.textContent = "Arrêt forcé (Stop envoyé)";
+      } catch (err) {
+        console.error(err);
+        statusLabel.textContent = "Erreur stop : " + err.message;
+      }
+    };
+  </script>
+</body>
+</html>
