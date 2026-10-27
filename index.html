@@ -16,7 +16,7 @@
       --danger-glow: rgba(239, 68, 68, 0.4);
       --text-main: #f8fafc;
       --text-muted: #64748b;
-      --font-stack: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      --font-stack: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
     }
 
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -115,6 +115,7 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
+      position: relative;
       transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
@@ -334,11 +335,13 @@
   const CHAR_FREQ       = "7764e8bc-c6a9-11e4-8731-1681e6b88ec1";
   const CHAR_POWER      = "966e06c6-c717-11e4-8731-1681e6b88ec1";
   const CHAR_STARTSTOP  = "7764eda8-c6a9-11e4-8731-1681e6b88ec1";
-  const CHAR_EXTRA1     = "776439af-c717-11e4-8731-1681e6b88ec1"; // Paquet maître de synchronisation
+  const CHAR_EXTRA1     = "776439af-c717-11e4-8731-1681e6b88ec1";
+  const CHAR_EXTRA2     = "776416cb-c717-11e4-8731-1681e6b88ec1";
 
   // Données extraites de l'iPad
   const CALIBRATED_PULSE = new Uint8Array([0x76, 0x76, 0x76, 0x64, 0x6D, 0x6D, 0x64, 0x52, 0x76, 0x52]);
   const EXTRA1_PAYLOAD   = new Uint8Array([0x15, 0x4D, 0x2D, 0x19, 0x00, 0x00, 0x7E, 0x05, 0x00, 0x17]);
+  const EXTRA2_PAYLOAD   = new Uint8Array([0x00, 0x00, 0x00, 0x01, 0x13, 0x02, 0x00, 0x00, 0x02, 0x00]);
 
   const MUSCLE_DATA = [
     { name: "Cuisses", svg: `<path d="M7 2v20M17 2v20M7 12h10"/>` },
@@ -355,7 +358,7 @@
 
   let device, server, service;
   let charProgDur, charWorkDur, charRestDur, charPulsePos, charRampUp, charRampDown;
-  let charFreq, charPower, charStartStop, charExtra1;
+  let charFreq, charPower, charStartStop, charExtra1, charExtra2;
 
   let isStimulating = false;
   let timerInterval = null;
@@ -438,6 +441,7 @@
       charPower     = await service.getCharacteristic(CHAR_POWER);
       charStartStop = await service.getCharacteristic(CHAR_STARTSTOP);
       charExtra1    = await service.getCharacteristic(CHAR_EXTRA1);
+      charExtra2    = await service.getCharacteristic(CHAR_EXTRA2);
 
       statusPill.classList.add("connected");
       statusText.textContent = "CONNECTÉ";
@@ -447,6 +451,7 @@
 
     } catch (e) {
       console.error(e);
+      alert("Erreur de connexion : " + e.message);
       statusText.textContent = "ERREUR";
       statusPill.classList.remove("connected");
     }
@@ -474,32 +479,38 @@
     try {
       pulseStatus.textContent = "SYNCHRONISATION...";
 
-      // 1. Envoi du paquet maître de synchronisation (Extra 1)
-      await charExtra1.writeValue(EXTRA1_PAYLOAD);
+      // Activation écoute des notifications sur Start/Stop
+      try {
+        await charStartStop.startNotifications();
+      } catch (notifErr) {
+        console.warn("Notifications non disponibles ou déjà actives :", notifErr);
+      }
 
-      // 2. Durée totale de séance : 20 min (1200 s = 0x04B0)
+      // 1. Paquets maîtres de synchronisation (Extra 1 & Extra 2)
+      await charExtra1.writeValue(EXTRA1_PAYLOAD);
+      await charExtra2.writeValue(EXTRA2_PAYLOAD);
+
+      // 2. Durée de session : 20 min (0x04B0)
       await charProgDur.writeValue(new Uint8Array([0x04, 0xB0]));
 
-      // 3. Durée travail (45) et repos (25)
+      // 3. Cycle travail (45) / repos (25)
       await charWorkDur.writeValue(new Uint8Array([0x00, 0x2D]));
       await charRestDur.writeValue(new Uint8Array([0x00, 0x19]));
 
-      // 4. Largeurs d'impulsion calibrées
+      // 4. Largeurs d'impulsion et rampes
       await charPulsePos.writeValue(CALIBRATED_PULSE);
-
-      // 5. Rampes 10 ms (0x0A sur chaque canal)
       const rampBuf = new Uint8Array(10).fill(0x0A);
       await charRampUp.writeValue(rampBuf);
       await charRampDown.writeValue(rampBuf);
 
-      // 6. Fréquence avec signature CRC
+      // 5. Fréquence avec signature CRC
       const freqBuf = new Uint8Array([0x00, 0x64, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xA5, 0xC1]);
       await charFreq.writeValue(freqBuf);
 
-      // 7. Intensités actuelles
+      // 6. Intensités
       await pushIntensity();
 
-      // 8. Déclenchement de la stimulation
+      // 7. Déclenchement de la stimulation
       await charStartStop.writeValue(new Uint8Array([0x01]));
 
       isStimulating = true;
@@ -514,7 +525,8 @@
       }, 1000);
 
     } catch (e) {
-      console.error("Échec d'armement :", e);
+      console.error(e);
+      alert("Erreur armement : " + e.message);
       emergencyShutdown();
     }
   };
