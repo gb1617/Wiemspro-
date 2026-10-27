@@ -3,396 +3,535 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>EMS Pro Studio — Wiemspro Controller</title>
+  <title>Wiemspro Studio Controller</title>
   <style>
     :root {
-      --bg: #090d16;
-      --card-bg: #131c2e;
+      --bg-dark: #070a13;
+      --card-surface: #101827;
       --card-border: #1e293b;
-      --accent: #0ea5e9;
-      --accent-glow: rgba(14, 165, 233, 0.25);
-      --success: #10b981;
-      --danger: #ef4444;
+      --accent-cyan: #06b6d4;
+      --accent-glow: rgba(6, 182, 212, 0.35);
+      --success-green: #10b981;
+      --danger-red: #ef4444;
+      --danger-glow: rgba(239, 68, 68, 0.4);
       --text-main: #f8fafc;
       --text-muted: #64748b;
+      --font-stack: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
     }
 
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    
     body {
       margin: 0;
-      padding: 16px;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      background-color: var(--bg);
+      padding: 16px 16px 110px 16px;
+      font-family: var(--font-stack);
+      background-color: var(--bg-dark);
       color: var(--text-main);
       display: flex;
       justify-content: center;
     }
 
-    .app-container {
+    .app-viewport {
       width: 100%;
-      max-width: 600px;
+      max-width: 580px;
       display: flex;
       flex-direction: column;
       gap: 16px;
     }
 
+    /* En-tête */
     header {
       display: flex;
-      align-items: center;
       justify-content: space-between;
-      border-bottom: 1px solid var(--card-border);
-      padding-bottom: 12px;
+      align-items: center;
+      padding: 12px 0 8px;
     }
 
-    .brand { font-size: 1.15rem; font-weight: 800; letter-spacing: 0.5px; }
-    .brand span { color: var(--accent); }
+    .brand-title {
+      font-size: 1.25rem;
+      font-weight: 900;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+    .brand-title span { color: var(--accent-cyan); }
 
-    .badge-status {
+    .status-pill {
       font-size: 0.75rem;
-      padding: 4px 10px;
+      padding: 6px 14px;
       border-radius: 999px;
       background: #1e293b;
       color: var(--text-muted);
-      font-weight: 600;
-    }
-    .badge-status.connected { background: rgba(16, 185, 129, 0.15); color: var(--success); }
-
-    .card {
-      background: var(--card-bg);
-      border: 1px solid var(--card-border);
-      border-radius: 14px;
-      padding: 16px;
-    }
-
-    .card-title {
-      font-size: 0.8rem;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      color: var(--text-muted);
-      margin-bottom: 12px;
       font-weight: 700;
+      letter-spacing: 0.5px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.3s ease;
+    }
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--text-muted);
+    }
+    .status-pill.connected {
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--success-green);
+    }
+    .status-pill.connected .status-dot {
+      background: var(--success-green);
+      box-shadow: 0 0 8px var(--success-green);
     }
 
-    /* Phase Visualizer */
-    .telemetry-row {
+    /* Cartes & Modules */
+    .card {
+      background: var(--card-surface);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 18px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    }
+
+    .card-label {
+      font-size: 0.75rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
+      color: var(--text-muted);
+      margin-bottom: 14px;
+    }
+
+    /* Hub télémétrie central */
+    .telemetry-hub {
       display: flex;
-      justify-content: space-around;
+      flex-direction: column;
       align-items: center;
-      text-align: center;
       padding: 8px 0;
     }
 
-    .phase-indicator {
-      width: 110px;
-      height: 110px;
+    .pulse-ring {
+      width: 140px;
+      height: 140px;
       border-radius: 50%;
-      border: 4px solid var(--card-border);
+      border: 5px solid #1e293b;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+      transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     }
-    .phase-indicator.active {
-      border-color: var(--accent);
-      box-shadow: 0 0 20px var(--accent-glow);
-    }
-    .phase-label { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; }
-    .phase-val { font-size: 1.5rem; font-weight: 800; }
 
-    /* Paramètres Globaux */
-    .slider-group {
-      margin-bottom: 14px;
+    .pulse-ring.active {
+      border-color: var(--accent-cyan);
+      box-shadow: 0 0 35px var(--accent-glow);
+      animation: pulseAnimation 2s infinite ease-in-out;
     }
-    .slider-header {
+
+    @keyframes pulseAnimation {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.03); }
+    }
+
+    .pulse-status { font-size: 0.8rem; font-weight: 800; letter-spacing: 1px; color: var(--text-muted); }
+    .pulse-timer { font-size: 2.1rem; font-weight: 900; margin-top: 2px; }
+
+    /* Curseur Master */
+    .slider-row {
       display: flex;
       justify-content: space-between;
-      font-size: 0.85rem;
-      margin-bottom: 6px;
+      align-items: center;
+      margin-bottom: 8px;
     }
-    .slider-val { font-weight: 700; color: var(--accent); }
+    .slider-caption { font-size: 0.9rem; font-weight: 600; }
+    .slider-metric { font-size: 1.1rem; font-weight: 800; color: var(--accent-cyan); }
 
     input[type=range] {
       width: 100%;
-      height: 6px;
+      height: 8px;
       background: #1e293b;
-      border-radius: 3px;
+      border-radius: 4px;
       outline: none;
       -webkit-appearance: none;
     }
     input[type=range]::-webkit-slider-thumb {
       -webkit-appearance: none;
-      width: 20px;
-      height: 20px;
+      width: 24px;
+      height: 24px;
       border-radius: 50%;
-      background: var(--accent);
+      background: var(--accent-cyan);
       cursor: pointer;
+      box-shadow: 0 0 10px var(--accent-glow);
     }
 
-    /* Grille Canaux Musculaires */
-    .channels-grid {
+    /* Grille Musculaire */
+    .muscle-matrix {
       display: grid;
       grid-template-columns: repeat(2, 1fr);
-      gap: 10px;
+      gap: 12px;
     }
 
-    .channel-box {
-      background: #0d1524;
+    .muscle-node {
+      background: #090f1d;
       border: 1px solid #1e293b;
-      border-radius: 8px;
-      padding: 10px;
-    }
-    .channel-name {
-      font-size: 0.75rem;
-      color: #94a3b8;
-      font-weight: 600;
-      margin-bottom: 4px;
-      display: flex;
-      justify-content: space-between;
-    }
-
-    /* Commandes */
-    .action-controls {
+      border-radius: 12px;
+      padding: 12px;
       display: flex;
       flex-direction: column;
-      gap: 10px;
+      gap: 8px;
+    }
+
+    .muscle-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .muscle-title-wrap {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .muscle-icon {
+      width: 18px;
+      height: 18px;
+      fill: none;
+      stroke: var(--accent-cyan);
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .muscle-name {
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: #cbd5e1;
+    }
+
+    .muscle-val {
+      font-size: 0.85rem;
+      font-weight: 800;
+      color: var(--accent-cyan);
+    }
+
+    /* Barre fixe d'urgence et d'armement */
+    .fixed-action-bar {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: rgba(7, 10, 19, 0.95);
+      backdrop-filter: blur(12px);
+      border-top: 1px solid var(--card-border);
+      padding: 12px 16px;
+      display: flex;
+      justify-content: center;
+      z-index: 999;
+    }
+
+    .action-container {
+      width: 100%;
+      max-width: 580px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
     }
 
     button {
-      width: 100%;
-      padding: 14px;
-      border-radius: 10px;
       border: none;
-      font-weight: 700;
-      font-size: 0.95rem;
+      border-radius: 12px;
+      font-weight: 800;
+      letter-spacing: 0.5px;
       cursor: pointer;
-      transition: opacity 0.2s;
+      padding: 16px;
+      font-size: 0.95rem;
+      text-transform: uppercase;
+      transition: all 0.2s ease;
     }
-    button:disabled { opacity: 0.4; cursor: not-allowed; }
+    button:disabled { opacity: 0.3; cursor: not-allowed; }
 
-    .btn-connect { background: #1e293b; color: var(--text-main); border: 1px solid var(--accent); }
-    .btn-start { background: var(--accent); color: white; }
+    .btn-connect {
+      background: #1e293b;
+      color: var(--text-main);
+      border: 1px solid var(--accent-cyan);
+      width: 100%;
+    }
+
+    .btn-start {
+      background: var(--accent-cyan);
+      color: #041019;
+      box-shadow: 0 4px 20px var(--accent-glow);
+    }
+
     .btn-stop {
-      background: var(--danger);
-      color: white;
-      font-size: 1.1rem;
-      box-shadow: 0 4px 15px rgba(239, 68, 68, 0.3);
+      background: var(--danger-red);
+      color: #ffffff;
+      box-shadow: 0 4px 20px var(--danger-glow);
     }
   </style>
 </head>
 <body>
 
-<div class="app-container">
+<div class="app-viewport">
+
   <header>
-    <div class="brand">EMS <span>STUDIO</span> PRO</div>
-    <div class="badge-status" id="badgeStatus">DÉCONNECTÉ</div>
+    <div class="brand-title">WIEMS<span>PRO</span> STUDIO</div>
+    <div class="status-pill" id="statusPill">
+      <div class="status-dot"></div>
+      <span id="statusText">DÉCONNECTÉ</span>
+    </div>
   </header>
 
-  <button class="btn-connect" id="btnConnect">Lancer l'appairage boîtier</button>
+  <button class="btn-connect" id="btnConnect">Lancer l'appairage Bluetooth</button>
 
-  <!-- Cycle de Stimulation -->
+  <!-- Visualiseur d'ondes -->
   <div class="card">
-    <div class="card-title">Moniteur de Stimulation</div>
-    <div class="telemetry-row">
-      <div class="phase-indicator" id="phaseVisualizer">
-        <span class="phase-label" id="phaseText">VEILLE</span>
-        <span class="phase-val" id="timerCount">0 s</span>
+    <div class="card-label">Moniteur d'impulsion</div>
+    <div class="telemetry-hub">
+      <div class="pulse-ring" id="pulseRing">
+        <span class="pulse-status" id="pulseStatus">VEILLE</span>
+        <span class="pulse-timer" id="pulseTimer">0 s</span>
       </div>
     </div>
   </div>
 
-  <!-- Paramètres Fondamentaux -->
+  <!-- Paramètres Fréquence & Master -->
   <div class="card">
-    <div class="card-title">Paramètres Généraux du Train d'Ondes</div>
-    <div class="slider-group">
-      <div class="slider-header">
-        <span>Fréquence d'impulsion</span>
-        <span class="slider-val"><span id="lblFreq">65</span> Hz</span>
+    <div class="card-label">Générateur d'impulsion</div>
+    
+    <div style="margin-bottom: 16px;">
+      <div class="slider-row">
+        <span class="slider-caption">Fréquence générale</span>
+        <span class="slider-metric"><span id="lblFreq">85</span> Hz</span>
       </div>
-      <input type="range" id="rngFreq" min="10" max="100" value="65">
+      <input type="range" id="rngFreq" min="10" max="100" value="85">
     </div>
-    <div class="slider-group">
-      <div class="slider-header">
-        <span>Master Intensité</span>
-        <span class="slider-val"><span id="lblMaster">0</span> %</span>
+
+    <div>
+      <div class="slider-row">
+        <span class="slider-caption">Master Intensité globale</span>
+        <span class="slider-metric"><span id="lblMaster">0</span> %</span>
       </div>
       <input type="range" id="rngMaster" min="0" max="100" value="0">
     </div>
   </div>
 
-  <!-- Cartographie des Canaux Musculaires -->
+  <!-- Grille des 10 canaux musculaires avec SVG -->
   <div class="card">
-    <div class="card-title">Intensité par Groupe Musculaire (0 - 100 %)</div>
-    <div class="channels-grid" id="channelsContainer"></div>
+    <div class="card-label">Groupes musculaires cibles (10 canaux)</div>
+    <div class="muscle-matrix" id="muscleMatrix"></div>
   </div>
 
-  <!-- Commandes Directes -->
-  <div class="action-controls">
-    <button class="btn-start" id="btnStart" disabled>COMMENCER LA SÉANCE</button>
-    <button class="btn-stop" id="btnStop" disabled>STOP D'URGENCE (COUPURE)</button>
+</div>
+
+<!-- Commandes d'urgence fixées en bas -->
+<div class="fixed-action-bar">
+  <div class="action-container">
+    <button class="btn-start" id="btnStart" disabled>Armer & Tirer</button>
+    <button class="btn-stop" id="btnStop" disabled>Stop d'urgence</button>
   </div>
 </div>
 
 <script>
-  // Constantes BLE Wiemspro
-  const SERVICE_UUID = "7764d8fe-c6a9-11e4-8731-1681e6b88ec1";
-  const CHAR_FREQ    = "7764e8bc-c6a9-11e4-8731-1681e6b88ec1";
-  const CHAR_POWER   = "966e06c6-c717-11e4-8731-1681e6b88ec1";
-  const CHAR_STATUS  = "7764eda8-c6a9-11e4-8731-1681e6b88ec1";
+  // Constantes Bluetooth GATT Wiemspro
+  const SERVICE_UUID   = "7764d8fe-c6a9-11e4-8731-1681e6b88ec1";
+  const CHAR_FREQ      = "7764e8bc-c6a9-11e4-8731-1681e6b88ec1";
+  const CHAR_POWER     = "966e06c6-c717-11e4-8731-1681e6b88ec1";
+  const CHAR_STARTSTOP = "7764eda8-c6a9-11e4-8731-1681e6b88ec1";
+  const CHAR_PULSE_POS = "7764e556-c6a9-11e4-8731-1681e6b88ec1";
+  const CHAR_RAMP_UP   = "7764dde0-c6a9-11e4-8731-1681e6b88ec1";
+  const CHAR_RAMP_DOWN = "7764df0c-c6a9-11e4-8731-1681e6b88ec1";
 
-  const MUSCLE_NAMES = [
-    "Quadriceps", "Fessiers", "Ischio-jambiers", "Abdominaux", "Lombaires",
-    "Dorsaux", "Pectoraux", "Bras", "Mollets", "Trapèzes"
+  // Signature d'impulsion positive extraite du dump iPad
+  const CALIBRATED_PULSE = new Uint8Array([0x76, 0x76, 0x76, 0x64, 0x6D, 0x6D, 0x64, 0x52, 0x76, 0x52]);
+
+  // Canaux avec icônes SVG intégrées
+  const MUSCLE_DATA = [
+    { name: "Quadriceps", svg: `<path d="M7 2v20M17 2v20M7 12h10"/>` },
+    { name: "Fessiers", svg: `<circle cx="8" cy="12" r="5"/><circle cx="16" cy="12" r="5"/>` },
+    { name: "Ischio-jambiers", svg: `<path d="M8 3l3 18M16 3l-3 18"/>` },
+    { name: "Abdominaux", svg: `<rect x="5" y="4" width="14" height="16" rx="2"/><line x1="5" y1="9" x2="19" y2="9"/><line x1="5" y1="14" x2="19" y2="14"/><line x1="12" y1="4" x2="12" y2="20"/>` },
+    { name: "Lombaires", svg: `<path d="M12 2v20M6 8h12M7 16h10"/>` },
+    { name: "Dorsaux", svg: `<path d="M4 6l8 4 8-4M4 18l8-4 8 4"/>` },
+    { name: "Pectoraux", svg: `<path d="M4 10c4-4 12-4 16 0M4 14c4 4 12 4 16 0"/>` },
+    { name: "Bras", svg: `<rect x="6" y="7" width="12" height="10" rx="3"/><path d="M2 12h4M18 12h4"/>` },
+    { name: "Mollets", svg: `<path d="M9 3c-2 6-1 12 0 18M15 3c2 6 1 12 0 18"/>` },
+    { name: "Trapèzes", svg: `<path d="M3 18L12 4l9 14H3z"/>` }
   ];
 
-  let device, server;
-  let charFreq, charPower, charStatus;
+  let device, server, service;
+  let charFreq, charPower, charStartStop, charPulsePos, charRampUp, charRampDown;
   let isStimulating = false;
-  let sessionInterval = null;
-  let elapsed = 0;
+  let timerInterval = null;
+  let elapsedSeconds = 0;
 
-  // Rendu de la grille des 10 canaux
-  const channelsContainer = document.getElementById("channelsContainer");
-  MUSCLE_NAMES.forEach((name, i) => {
-    const box = document.createElement("div");
-    box.className = "channel-box";
-    box.innerHTML = `
-      <div class="channel-name"><span>${name}</span><span id="lblCh${i}">0%</span></div>
-      <input type="range" id="rngCh${i}" min="0" max="100" value="0">
+  // Construction de la grille musculaire
+  const matrixContainer = document.getElementById("muscleMatrix");
+  MUSCLE_DATA.forEach((m, idx) => {
+    const node = document.createElement("div");
+    node.className = "muscle-node";
+    node.innerHTML = `
+      <div class="muscle-header">
+        <div class="muscle-title-wrap">
+          <svg class="muscle-icon" viewBox="0 0 24 24">${m.svg}</svg>
+          <span class="muscle-name">${m.name}</span>
+        </div>
+        <span class="muscle-val" id="valCh${idx}">0%</span>
+      </div>
+      <input type="range" id="ch${idx}" min="0" max="100" value="0">
     `;
-    channelsContainer.appendChild(box);
+    matrixContainer.appendChild(node);
   });
 
-  // Liaison UI Slider
+  // Gestion des Sliders
   const rngFreq = document.getElementById("rngFreq");
   const lblFreq = document.getElementById("lblFreq");
   const rngMaster = document.getElementById("rngMaster");
   const lblMaster = document.getElementById("lblMaster");
 
   rngFreq.oninput = () => lblFreq.textContent = rngFreq.value;
+
   rngMaster.oninput = () => {
-    lblMaster.textContent = rngMaster.value;
+    const v = rngMaster.value;
+    lblMaster.textContent = v;
     for (let i = 0; i < 10; i++) {
-      document.getElementById(`rngCh${i}`).value = rngMaster.value;
-      document.getElementById(`lblCh${i}`).textContent = rngMaster.value + "%";
+      document.getElementById(`ch${i}`).value = v;
+      document.getElementById(`valCh${i}`).textContent = v + "%";
     }
+    if (isStimulating) pushIntensity();
   };
 
   for (let i = 0; i < 10; i++) {
-    const slider = document.getElementById(`rngCh${i}`);
-    const label = document.getElementById(`lblCh${i}`);
-    slider.oninput = () => {
-      label.textContent = slider.value + "%";
-      if (isStimulating) pushPower();
+    const s = document.getElementById(`ch${i}`);
+    const v = document.getElementById(`valCh${i}`);
+    s.oninput = () => {
+      v.textContent = s.value + "%";
+      if (isStimulating) pushIntensity();
     };
   }
 
   // Connexion Web Bluetooth
   const btnConnect = document.getElementById("btnConnect");
-  const badgeStatus = document.getElementById("badgeStatus");
+  const statusPill = document.getElementById("statusPill");
+  const statusText = document.getElementById("statusText");
   const btnStart = document.getElementById("btnStart");
   const btnStop = document.getElementById("btnStop");
-  const phaseVisualizer = document.getElementById("phaseVisualizer");
-  const phaseText = document.getElementById("phaseText");
-  const timerCount = document.getElementById("timerCount");
+  const pulseRing = document.getElementById("pulseRing");
+  const pulseStatus = document.getElementById("pulseStatus");
+  const pulseTimer = document.getElementById("pulseTimer");
 
   btnConnect.onclick = async () => {
     try {
+      statusText.textContent = "SCAN...";
       device = await navigator.bluetooth.requestDevice({
         filters: [{ namePrefix: "WIEMS" }],
         optionalServices: [SERVICE_UUID]
       });
 
       device.addEventListener('gattserverdisconnected', onDisconnected);
-      badgeStatus.textContent = "CONNEXION...";
+
+      statusText.textContent = "CONNEXION...";
       server = await device.gatt.connect();
 
-      const service = await server.getPrimaryService(SERVICE_UUID);
-      charFreq = await service.getCharacteristic(CHAR_FREQ);
-      charPower = await service.getCharacteristic(CHAR_POWER);
-      charStatus = await service.getCharacteristic(CHAR_STATUS);
+      service = await server.getPrimaryService(SERVICE_UUID);
+      charFreq       = await service.getCharacteristic(CHAR_FREQ);
+      charPower      = await service.getCharacteristic(CHAR_POWER);
+      charStartStop  = await service.getCharacteristic(CHAR_STARTSTOP);
+      charPulsePos   = await service.getCharacteristic(CHAR_PULSE_POS);
+      charRampUp     = await service.getCharacteristic(CHAR_RAMP_UP);
+      charRampDown   = await service.getCharacteristic(CHAR_RAMP_DOWN);
 
-      badgeStatus.textContent = "CONNECTÉ";
-      badgeStatus.classList.add("connected");
+      statusPill.classList.add("connected");
+      statusText.textContent = "CONNECTÉ";
       btnConnect.style.display = "none";
       btnStart.disabled = false;
       btnStop.disabled = false;
 
     } catch (e) {
       console.error(e);
-      badgeStatus.textContent = "ÉCHEC";
+      statusText.textContent = "ERREUR";
+      statusPill.classList.remove("connected");
     }
   };
 
   function onDisconnected() {
     emergencyShutdown();
-    badgeStatus.textContent = "DÉCONNECTÉ";
-    badgeStatus.classList.remove("connected");
+    statusPill.classList.remove("connected");
+    statusText.textContent = "DÉCONNECTÉ";
     btnConnect.style.display = "block";
     btnStart.disabled = true;
     btnStop.disabled = true;
   }
 
-  // Envoi des fréquences (10 octets)
-  async function pushFrequency() {
-    if (!charFreq) return;
-    const f = parseInt(rngFreq.value, 10);
-    const buf = new Uint8Array(10).fill(f);
-    await charFreq.writeValue(buf);
-  }
-
-  // Envoi des puissances (10 octets)
-  async function pushPower() {
+  async function pushIntensity() {
     if (!charPower) return;
     const buf = new Uint8Array(10);
     for (let i = 0; i < 10; i++) {
-      buf[i] = parseInt(document.getElementById(`rngCh${i}`).value, 10);
+      buf[i] = parseInt(document.getElementById(`ch${i}`).value, 10);
     }
     await charPower.writeValue(buf);
   }
 
-  // Start
+  // Séquence d'armement et départ
   btnStart.onclick = async () => {
     try {
-      await pushFrequency();
-      await pushPower();
-      await charStatus.writeValue(new Uint8Array([0x01]));
+      pulseStatus.textContent = "ARMEMENT";
+
+      // 1. Initialisation des largeurs d'impulsion calibrées
+      await charPulsePos.writeValue(CALIBRATED_PULSE);
+
+      // 2. Rampes (10 ms par canal)
+      const rampBuf = new Uint8Array(10).fill(10);
+      await charRampUp.writeValue(rampBuf);
+      await charRampDown.writeValue(rampBuf);
+
+      // 3. Fréquence (injection trame avec signature de contrôle)
+      const freqBuf = new Uint8Array([0x00, 0x64, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xA5, 0xC1]);
+      await charFreq.writeValue(freqBuf);
+
+      // 4. Envoi des intensités actuelles
+      await pushIntensity();
+
+      // 5. Ordre de marche
+      await charStartStop.writeValue(new Uint8Array([0x01]));
 
       isStimulating = true;
-      phaseVisualizer.classList.add("active");
-      phaseText.textContent = "ACTIF";
+      pulseRing.classList.add("active");
+      pulseStatus.textContent = "STIMULATION";
       btnStart.disabled = true;
 
-      elapsed = 0;
-      sessionInterval = setInterval(() => {
-        elapsed++;
-        timerCount.textContent = elapsed + " s";
+      elapsedSeconds = 0;
+      timerInterval = setInterval(() => {
+        elapsedSeconds++;
+        pulseTimer.textContent = elapsedSeconds + " s";
       }, 1000);
 
     } catch (e) {
-      console.error(e);
+      console.error("Échec d'armement :", e);
       emergencyShutdown();
     }
   };
 
-  // Stop d'urgence
   btnStop.onclick = emergencyShutdown;
 
   async function emergencyShutdown() {
     isStimulating = false;
-    clearInterval(sessionInterval);
-    phaseVisualizer.classList.remove("active");
-    phaseText.textContent = "ARRÊT";
-    timerCount.textContent = "0 s";
+    clearInterval(timerInterval);
+    pulseRing.classList.remove("active");
+    pulseStatus.textContent = "VEILLE";
+    pulseTimer.textContent = "0 s";
     btnStart.disabled = false;
 
     try {
-      if (charStatus) await charStatus.writeValue(new Uint8Array([0x00]));
+      if (charStartStop) await charStartStop.writeValue(new Uint8Array([0x00]));
       if (charPower) await charPower.writeValue(new Uint8Array(10).fill(0));
     } catch (e) {
-      console.warn("Échec de la coupure matérielle :", e);
+      console.warn("Erreur arrêt d'urgence :", e);
     }
   }
 </script>
+
 </body>
-</html>
+  </html>
+  
