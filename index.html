@@ -2,147 +2,397 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Wiemspro BLE Test Controller</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>EMS Pro Studio — Wiemspro Controller</title>
   <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 20px; background: #0f172a; color: #f8fafc; max-width: 500px; margin: auto; }
-    .card { background: #1e293b; padding: 18px; border-radius: 12px; margin-bottom: 16px; border: 1px solid #334155; }
-    h2 { margin-top: 0; font-size: 1.1rem; color: #38bdf8; }
-    button { width: 100%; padding: 14px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 1rem; margin-bottom: 8px; }
-    .btn-connect { background: #2563eb; color: white; }
-    .btn-start { background: #16a34a; color: white; }
-    .btn-stop { background: #dc2626; color: white; font-size: 1.2rem; }
-    .status { font-weight: bold; padding: 8px; border-radius: 6px; background: #0f172a; text-align: center; font-size: 0.9rem; }
-    label { display: block; margin-top: 12px; margin-bottom: 4px; font-size: 0.85rem; color: #94a3b8; }
-    input[type=range] { width: 100%; }
-    .val-display { float: right; color: #f8fafc; font-weight: bold; }
+    :root {
+      --bg: #090d16;
+      --card-bg: #131c2e;
+      --card-border: #1e293b;
+      --accent: #0ea5e9;
+      --accent-glow: rgba(14, 165, 233, 0.25);
+      --success: #10b981;
+      --danger: #ef4444;
+      --text-main: #f8fafc;
+      --text-muted: #64748b;
+    }
+
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    body {
+      margin: 0;
+      padding: 16px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: var(--bg);
+      color: var(--text-main);
+      display: flex;
+      justify-content: center;
+    }
+
+    .app-container {
+      width: 100%;
+      max-width: 600px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--card-border);
+      padding-bottom: 12px;
+    }
+
+    .brand { font-size: 1.15rem; font-weight: 800; letter-spacing: 0.5px; }
+    .brand span { color: var(--accent); }
+
+    .badge-status {
+      font-size: 0.75rem;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: #1e293b;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+    .badge-status.connected { background: rgba(16, 185, 129, 0.15); color: var(--success); }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 14px;
+      padding: 16px;
+    }
+
+    .card-title {
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+      font-weight: 700;
+    }
+
+    /* Phase Visualizer */
+    .telemetry-row {
+      display: flex;
+      justify-content: space-around;
+      align-items: center;
+      text-align: center;
+      padding: 8px 0;
+    }
+
+    .phase-indicator {
+      width: 110px;
+      height: 110px;
+      border-radius: 50%;
+      border: 4px solid var(--card-border);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .phase-indicator.active {
+      border-color: var(--accent);
+      box-shadow: 0 0 20px var(--accent-glow);
+    }
+    .phase-label { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; }
+    .phase-val { font-size: 1.5rem; font-weight: 800; }
+
+    /* Paramètres Globaux */
+    .slider-group {
+      margin-bottom: 14px;
+    }
+    .slider-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.85rem;
+      margin-bottom: 6px;
+    }
+    .slider-val { font-weight: 700; color: var(--accent); }
+
+    input[type=range] {
+      width: 100%;
+      height: 6px;
+      background: #1e293b;
+      border-radius: 3px;
+      outline: none;
+      -webkit-appearance: none;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: var(--accent);
+      cursor: pointer;
+    }
+
+    /* Grille Canaux Musculaires */
+    .channels-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+    }
+
+    .channel-box {
+      background: #0d1524;
+      border: 1px solid #1e293b;
+      border-radius: 8px;
+      padding: 10px;
+    }
+    .channel-name {
+      font-size: 0.75rem;
+      color: #94a3b8;
+      font-weight: 600;
+      margin-bottom: 4px;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    /* Commandes */
+    .action-controls {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    button {
+      width: 100%;
+      padding: 14px;
+      border-radius: 10px;
+      border: none;
+      font-weight: 700;
+      font-size: 0.95rem;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+    button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .btn-connect { background: #1e293b; color: var(--text-main); border: 1px solid var(--accent); }
+    .btn-start { background: var(--accent); color: white; }
+    .btn-stop {
+      background: var(--danger);
+      color: white;
+      font-size: 1.1rem;
+      box-shadow: 0 4px 15px rgba(239, 68, 68, 0.3);
+    }
   </style>
 </head>
 <body>
 
-  <h1>Wiemspro Controller Test</h1>
+<div class="app-container">
+  <header>
+    <div class="brand">EMS <span>STUDIO</span> PRO</div>
+    <div class="badge-status" id="badgeStatus">DÉCONNECTÉ</div>
+  </header>
 
+  <button class="btn-connect" id="btnConnect">Lancer l'appairage boîtier</button>
+
+  <!-- Cycle de Stimulation -->
   <div class="card">
-    <h2>Liaison Bluetooth</h2>
-    <button class="btn-connect" id="connectBtn">Rechercher et connecter le boîtier</button>
-    <div class="status" id="statusLabel">Statut : Déconnecté</div>
+    <div class="card-title">Moniteur de Stimulation</div>
+    <div class="telemetry-row">
+      <div class="phase-indicator" id="phaseVisualizer">
+        <span class="phase-label" id="phaseText">VEILLE</span>
+        <span class="phase-val" id="timerCount">0 s</span>
+      </div>
+    </div>
   </div>
 
+  <!-- Paramètres Fondamentaux -->
   <div class="card">
-    <h2>Paramètres</h2>
-    <label>Fréquence globale (Hz) <span class="val-display" id="freqVal">50</span></label>
-    <input type="range" id="freqInput" min="5" max="100" value="50">
-
-    <label>Intensité Canal 1 (%) <span class="val-display" id="powerVal">0</span></label>
-    <input type="range" id="powerInput" min="0" max="30" value="0">
+    <div class="card-title">Paramètres Généraux du Train d'Ondes</div>
+    <div class="slider-group">
+      <div class="slider-header">
+        <span>Fréquence d'impulsion</span>
+        <span class="slider-val"><span id="lblFreq">65</span> Hz</span>
+      </div>
+      <input type="range" id="rngFreq" min="10" max="100" value="65">
+    </div>
+    <div class="slider-group">
+      <div class="slider-header">
+        <span>Master Intensité</span>
+        <span class="slider-val"><span id="lblMaster">0</span> %</span>
+      </div>
+      <input type="range" id="rngMaster" min="0" max="100" value="0">
+    </div>
   </div>
 
+  <!-- Cartographie des Canaux Musculaires -->
   <div class="card">
-    <button class="btn-start" id="startBtn" disabled>START STIMULATION</button>
-    <button class="btn-stop" id="stopBtn" disabled>STOP D'URGENCE (0x00)</button>
+    <div class="card-title">Intensité par Groupe Musculaire (0 - 100 %)</div>
+    <div class="channels-grid" id="channelsContainer"></div>
   </div>
 
-  <script>
-    // UUIDs issus des relevés nRF Connect
-    const SERVICE_UUID = "7764d8fe-c6a9-11e4-8731-1681e6b88ec1";
-    const CHAR_FREQUENCY_UUID = "7764e8bc-c6a9-11e4-8731-1681e6b88ec1";
-    const CHAR_POWER_UUID     = "966e06c6-c717-11e4-8731-1681e6b88ec1";
-    const CHAR_STARTSTOP_UUID = "7764eda8-c6a9-11e4-8731-1681e6b88ec1";
+  <!-- Commandes Directes -->
+  <div class="action-controls">
+    <button class="btn-start" id="btnStart" disabled>COMMENCER LA SÉANCE</button>
+    <button class="btn-stop" id="btnStop" disabled>STOP D'URGENCE (COUPURE)</button>
+  </div>
+</div>
 
-    let device, server;
-    let charFreq, charPower, charStartStop;
+<script>
+  // Constantes BLE Wiemspro
+  const SERVICE_UUID = "7764d8fe-c6a9-11e4-8731-1681e6b88ec1";
+  const CHAR_FREQ    = "7764e8bc-c6a9-11e4-8731-1681e6b88ec1";
+  const CHAR_POWER   = "966e06c6-c717-11e4-8731-1681e6b88ec1";
+  const CHAR_STATUS  = "7764eda8-c6a9-11e4-8731-1681e6b88ec1";
 
-    const statusLabel = document.getElementById('statusLabel');
-    const connectBtn = document.getElementById('connectBtn');
-    const startBtn = document.getElementById('startBtn');
-    const stopBtn = document.getElementById('stopBtn');
-    const freqInput = document.getElementById('freqInput');
-    const powerInput = document.getElementById('powerInput');
+  const MUSCLE_NAMES = [
+    "Quadriceps", "Fessiers", "Ischio-jambiers", "Abdominaux", "Lombaires",
+    "Dorsaux", "Pectoraux", "Bras", "Mollets", "Trapèzes"
+  ];
 
-    freqInput.oninput = () => document.getElementById('freqVal').textContent = freqInput.value;
-    powerInput.oninput = () => document.getElementById('powerVal').textContent = powerInput.value;
+  let device, server;
+  let charFreq, charPower, charStatus;
+  let isStimulating = false;
+  let sessionInterval = null;
+  let elapsed = 0;
 
-    connectBtn.onclick = async () => {
-      try {
-        statusLabel.textContent = "Recherche en cours...";
-        device = await navigator.bluetooth.requestDevice({
-          filters: [{ namePrefix: "WIEMS" }],
-          optionalServices: [SERVICE_UUID]
-        });
+  // Rendu de la grille des 10 canaux
+  const channelsContainer = document.getElementById("channelsContainer");
+  MUSCLE_NAMES.forEach((name, i) => {
+    const box = document.createElement("div");
+    box.className = "channel-box";
+    box.innerHTML = `
+      <div class="channel-name"><span>${name}</span><span id="lblCh${i}">0%</span></div>
+      <input type="range" id="rngCh${i}" min="0" max="100" value="0">
+    `;
+    channelsContainer.appendChild(box);
+  });
 
-        device.addEventListener('gattserverdisconnected', onDisconnected);
+  // Liaison UI Slider
+  const rngFreq = document.getElementById("rngFreq");
+  const lblFreq = document.getElementById("lblFreq");
+  const rngMaster = document.getElementById("rngMaster");
+  const lblMaster = document.getElementById("lblMaster");
 
-        statusLabel.textContent = "Connexion au serveur GATT...";
-        server = await device.gatt.connect();
-
-        statusLabel.textContent = "Récupération des services...";
-        const service = await server.getPrimaryService(SERVICE_UUID);
-
-        charFreq = await service.getCharacteristic(CHAR_FREQUENCY_UUID);
-        charPower = await service.getCharacteristic(CHAR_POWER_UUID);
-        charStartStop = await service.getCharacteristic(CHAR_STARTSTOP_UUID);
-
-        statusLabel.textContent = "Connecté : " + device.name;
-        statusLabel.style.color = "#4ade80";
-        startBtn.disabled = false;
-        stopBtn.disabled = false;
-        connectBtn.disabled = true;
-
-      } catch (error) {
-        console.error(error);
-        statusLabel.textContent = "Erreur : " + error.message;
-        statusLabel.style.color = "#f87171";
-      }
-    };
-
-    function onDisconnected() {
-      statusLabel.textContent = "Périphérique déconnecté";
-      statusLabel.style.color = "#f87171";
-      startBtn.disabled = true;
-      stopBtn.disabled = true;
-      connectBtn.disabled = false;
+  rngFreq.oninput = () => lblFreq.textContent = rngFreq.value;
+  rngMaster.oninput = () => {
+    lblMaster.textContent = rngMaster.value;
+    for (let i = 0; i < 10; i++) {
+      document.getElementById(`rngCh${i}`).value = rngMaster.value;
+      document.getElementById(`lblCh${i}`).textContent = rngMaster.value + "%";
     }
+  };
 
-    startBtn.onclick = async () => {
-      try {
-        const freq = parseInt(freqInput.value, 10);
-        const pwr = parseInt(powerInput.value, 10);
-
-        // Préparation du buffer Fréquence (10 octets)
-        const freqBuffer = new Uint8Array([freq, freq, freq, freq, freq, freq, freq, freq, freq, freq]);
-        await charFreq.writeValue(freqBuffer);
-
-        // Préparation du buffer Intensité (Canal 1 actif, autres à 0)
-        const powerBuffer = new Uint8Array([pwr, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
-        await charPower.writeValue(powerBuffer);
-
-        // Ordre Start (0x01)
-        const startBuffer = new Uint8Array([0x01]);
-        await charStartStop.writeValue(startBuffer);
-
-        statusLabel.textContent = `En émission (Freq: ${freq}Hz, Ch1: ${pwr}%)`;
-      } catch (err) {
-        console.error(err);
-        statusLabel.textContent = "Erreur écriture : " + err.message;
-      }
+  for (let i = 0; i < 10; i++) {
+    const slider = document.getElementById(`rngCh${i}`);
+    const label = document.getElementById(`lblCh${i}`);
+    slider.oninput = () => {
+      label.textContent = slider.value + "%";
+      if (isStimulating) pushPower();
     };
+  }
 
-    stopBtn.onclick = async () => {
-      try {
-        // Envoi Stop (0x00)
-        const stopBuffer = new Uint8Array([0x00]);
-        await charStartStop.writeValue(stopBuffer);
+  // Connexion Web Bluetooth
+  const btnConnect = document.getElementById("btnConnect");
+  const badgeStatus = document.getElementById("badgeStatus");
+  const btnStart = document.getElementById("btnStart");
+  const btnStop = document.getElementById("btnStop");
+  const phaseVisualizer = document.getElementById("phaseVisualizer");
+  const phaseText = document.getElementById("phaseText");
+  const timerCount = document.getElementById("timerCount");
 
-        // Remise à zéro des puissances
-        const zeroPower = new Uint8Array(10);
-        await charPower.writeValue(zeroPower);
+  btnConnect.onclick = async () => {
+    try {
+      device = await navigator.bluetooth.requestDevice({
+        filters: [{ namePrefix: "WIEMS" }],
+        optionalServices: [SERVICE_UUID]
+      });
 
-        statusLabel.textContent = "Arrêt forcé (Stop envoyé)";
-      } catch (err) {
-        console.error(err);
-        statusLabel.textContent = "Erreur stop : " + err.message;
-      }
-    };
-  </script>
+      device.addEventListener('gattserverdisconnected', onDisconnected);
+      badgeStatus.textContent = "CONNEXION...";
+      server = await device.gatt.connect();
+
+      const service = await server.getPrimaryService(SERVICE_UUID);
+      charFreq = await service.getCharacteristic(CHAR_FREQ);
+      charPower = await service.getCharacteristic(CHAR_POWER);
+      charStatus = await service.getCharacteristic(CHAR_STATUS);
+
+      badgeStatus.textContent = "CONNECTÉ";
+      badgeStatus.classList.add("connected");
+      btnConnect.style.display = "none";
+      btnStart.disabled = false;
+      btnStop.disabled = false;
+
+    } catch (e) {
+      console.error(e);
+      badgeStatus.textContent = "ÉCHEC";
+    }
+  };
+
+  function onDisconnected() {
+    emergencyShutdown();
+    badgeStatus.textContent = "DÉCONNECTÉ";
+    badgeStatus.classList.remove("connected");
+    btnConnect.style.display = "block";
+    btnStart.disabled = true;
+    btnStop.disabled = true;
+  }
+
+  // Envoi des fréquences (10 octets)
+  async function pushFrequency() {
+    if (!charFreq) return;
+    const f = parseInt(rngFreq.value, 10);
+    const buf = new Uint8Array(10).fill(f);
+    await charFreq.writeValue(buf);
+  }
+
+  // Envoi des puissances (10 octets)
+  async function pushPower() {
+    if (!charPower) return;
+    const buf = new Uint8Array(10);
+    for (let i = 0; i < 10; i++) {
+      buf[i] = parseInt(document.getElementById(`rngCh${i}`).value, 10);
+    }
+    await charPower.writeValue(buf);
+  }
+
+  // Start
+  btnStart.onclick = async () => {
+    try {
+      await pushFrequency();
+      await pushPower();
+      await charStatus.writeValue(new Uint8Array([0x01]));
+
+      isStimulating = true;
+      phaseVisualizer.classList.add("active");
+      phaseText.textContent = "ACTIF";
+      btnStart.disabled = true;
+
+      elapsed = 0;
+      sessionInterval = setInterval(() => {
+        elapsed++;
+        timerCount.textContent = elapsed + " s";
+      }, 1000);
+
+    } catch (e) {
+      console.error(e);
+      emergencyShutdown();
+    }
+  };
+
+  // Stop d'urgence
+  btnStop.onclick = emergencyShutdown;
+
+  async function emergencyShutdown() {
+    isStimulating = false;
+    clearInterval(sessionInterval);
+    phaseVisualizer.classList.remove("active");
+    phaseText.textContent = "ARRÊT";
+    timerCount.textContent = "0 s";
+    btnStart.disabled = false;
+
+    try {
+      if (charStatus) await charStatus.writeValue(new Uint8Array([0x00]));
+      if (charPower) await charPower.writeValue(new Uint8Array(10).fill(0));
+    } catch (e) {
+      console.warn("Échec de la coupure matérielle :", e);
+    }
+  }
+</script>
 </body>
 </html>
