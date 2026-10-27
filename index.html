@@ -475,42 +475,57 @@
     await charPower.writeValue(buf);
   }
 
+// Petite fonction utilitaire pour espacer les écritures BLE
+  const delay = ms => new Promise(res => setTimeout(res, ms));
+
   btnStart.onclick = async () => {
     try {
       pulseStatus.textContent = "SYNCHRONISATION...";
 
-      // Activation écoute des notifications sur Start/Stop
+      // 1. Activation des notifications sur Extra 2 et Start/Stop (autorisées en READ/NOTIFY)
       try {
+        await charExtra2.startNotifications();
         await charStartStop.startNotifications();
-      } catch (notifErr) {
-        console.warn("Notifications non disponibles ou déjà actives :", notifErr);
+      } catch (e) {
+        console.warn("Notifications déjà actives ou optionnelles");
       }
+      await delay(50);
 
-      // 1. Paquets maîtres de synchronisation (Extra 1 & Extra 2)
+      // 2. Envoi du paquet maître Extra 1 (propriété READ, WRITE validée)
       await charExtra1.writeValue(EXTRA1_PAYLOAD);
-      await charExtra2.writeValue(EXTRA2_PAYLOAD);
+      await delay(50);
 
-      // 2. Durée de session : 20 min (0x04B0)
+      // 3. Durée de session : 20 min (0x04B0)
       await charProgDur.writeValue(new Uint8Array([0x04, 0xB0]));
+      await delay(50);
 
-      // 3. Cycle travail (45) / repos (25)
+      // 4. Cycle contraction (45) / repos (25)
       await charWorkDur.writeValue(new Uint8Array([0x00, 0x2D]));
+      await delay(50);
       await charRestDur.writeValue(new Uint8Array([0x00, 0x19]));
+      await delay(50);
 
-      // 4. Largeurs d'impulsion et rampes
+      // 5. Largeurs d'impulsion calibrées
       await charPulsePos.writeValue(CALIBRATED_PULSE);
+      await delay(50);
+
+      // 6. Rampes 10 ms
       const rampBuf = new Uint8Array(10).fill(0x0A);
       await charRampUp.writeValue(rampBuf);
+      await delay(50);
       await charRampDown.writeValue(rampBuf);
+      await delay(50);
 
-      // 5. Fréquence avec signature CRC
+      // 7. Fréquence avec signature CRC
       const freqBuf = new Uint8Array([0x00, 0x64, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xA5, 0xC1]);
       await charFreq.writeValue(freqBuf);
+      await delay(50);
 
-      // 6. Intensités
+      // 8. Intensités musculaires
       await pushIntensity();
+      await delay(50);
 
-      // 7. Déclenchement de la stimulation
+      // 9. Commande Start
       await charStartStop.writeValue(new Uint8Array([0x01]));
 
       isStimulating = true;
@@ -530,8 +545,6 @@
       emergencyShutdown();
     }
   };
-
-  btnStop.onclick = emergencyShutdown;
 
   async function emergencyShutdown() {
     isStimulating = false;
