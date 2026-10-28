@@ -323,9 +323,8 @@
 </div>
 
 <script>
-  // Registres GATT Wiemspro
+  // Registres GATT Wiemspro identifiés
   const SERVICE_UUID    = "7764d8fe-c6a9-11e4-8731-1681e6b88ec1";
-  const CHAR_TRIGGER    = "7764a25c-c6a9-11e4-8731-1681e6b88ec1"; // Déclencheur / Armement matériel
   const CHAR_PROG_DUR   = "7764db60-c6a9-11e4-8731-1681e6b88ec1";
   const CHAR_WORK_DUR   = "7764dcaa-c6a9-11e4-8731-1681e6b88ec1";
   const CHAR_REST_DUR   = "7764e038-c6a9-11e4-8731-1681e6b88ec1";
@@ -338,6 +337,8 @@
   const CHAR_POWER      = "966e06c6-c717-11e4-8731-1681e6b88ec1";
   const CHAR_STARTSTOP  = "7764eda8-c6a9-11e4-8731-1681e6b88ec1";
   const CHAR_EXTRA1     = "776439af-c717-11e4-8731-1681e6b88ec1";
+  const CHAR_EXTRA2     = "776416cb-c717-11e4-8731-1681e6b88ec1";
+  const CHAR_STATUS     = "b1f5a058-c717-11e4-8731-1681e6b88ec1";
 
   // Données extraites de l'iPad
   const CALIBRATED_PULSE = new Uint8Array([0x76, 0x76, 0x76, 0x64, 0x6D, 0x6D, 0x64, 0x52, 0x76, 0x52]);
@@ -357,8 +358,8 @@
   ];
 
   let device, server, service;
-  let charTrigger, charProgDur, charWorkDur, charRestDur, charPulsePos, charPulseNeut, charPulseNeg;
-  let charRampUp, charRampDown, charFreq, charPower, charStartStop, charExtra1;
+  let charProgDur, charWorkDur, charRestDur, charPulsePos, charPulseNeut, charPulseNeg;
+  let charRampUp, charRampDown, charFreq, charPower, charStartStop, charExtra1, charExtra2, charStatus;
 
   let isStimulating = false;
   let timerInterval = null;
@@ -433,7 +434,6 @@
 
       service = await server.getPrimaryService(SERVICE_UUID);
       
-      charTrigger   = await service.getCharacteristic(CHAR_TRIGGER);
       charProgDur   = await service.getCharacteristic(CHAR_PROG_DUR);
       charWorkDur   = await service.getCharacteristic(CHAR_WORK_DUR);
       charRestDur   = await service.getCharacteristic(CHAR_REST_DUR);
@@ -446,6 +446,17 @@
       charPower     = await service.getCharacteristic(CHAR_POWER);
       charStartStop = await service.getCharacteristic(CHAR_STARTSTOP);
       charExtra1    = await service.getCharacteristic(CHAR_EXTRA1);
+      charExtra2    = await service.getCharacteristic(CHAR_EXTRA2);
+      charStatus    = await service.getCharacteristic(CHAR_STATUS);
+
+      // Activation des flux de télémétrie dès la connexion (comme l'iPad)
+      try {
+        await charExtra2.startNotifications();
+        await charStartStop.startNotifications();
+        await charStatus.startNotifications();
+      } catch (notifErr) {
+        console.warn("Notifications partielles :", notifErr);
+      }
 
       statusPill.classList.add("connected");
       statusText.textContent = "CONNECTÉ";
@@ -481,10 +492,10 @@
 
   btnStart.onclick = async () => {
     try {
-      pulseStatus.textContent = "INITIALISATION...";
+      pulseStatus.textContent = "SYNCHRONISATION...";
       btnStart.disabled = true;
 
-      // 1. Durée totale de séance : 20 min (1200 s = 0x04B0)
+      // 1. Durée totale de la séance : 20 min (1200 s = 0x04B0)
       await charProgDur.writeValue(new Uint8Array([0x04, 0xB0]));
       await delay(40);
 
@@ -494,15 +505,15 @@
       await charRestDur.writeValue(new Uint8Array([0x00, 0x19]));
       await delay(40);
 
-      // 3. Forme d'onde : Positive, Neutre (0), Négative (égale à Positive)
+      // 3. Forme d'onde : Positive calibrée, Neutre à 0, Négative à 0 (conforme dump iPad)
       await charPulsePos.writeValue(CALIBRATED_PULSE);
       await delay(40);
       await charPulseNeut.writeValue(new Uint8Array(10).fill(0x00));
       await delay(40);
-      await charPulseNeg.writeValue(CALIBRATED_PULSE);
+      await charPulseNeg.writeValue(new Uint8Array(10).fill(0x00));
       await delay(40);
 
-      // 4. Rampes 10 ms
+      // 4. Rampes 10 ms (0x0A sur chaque canal)
       const rampBuf = new Uint8Array(10).fill(0x0A);
       await charRampUp.writeValue(rampBuf);
       await delay(40);
@@ -523,12 +534,10 @@
       await pushIntensity();
       await delay(40);
 
-      // 8. Envoi de l'impulsion sur la caractéristique de déclenchement 7764a25c
-      await charTrigger.writeValue(new Uint8Array([0x01]));
-      await delay(40);
-
-      // 9. Ordre de marche Start (0x01)
+      // 8. Séquence d'activation Start (Armement 0x01 puis Déclenchement 0x02)
       await charStartStop.writeValue(new Uint8Array([0x01]));
+      await delay(60);
+      await charStartStop.writeValue(new Uint8Array([0x02]));
 
       isStimulating = true;
       pulseRing.classList.add("active");
@@ -559,9 +568,6 @@
     btnStart.disabled = false;
 
     try {
-      if (charTrigger) {
-        await charTrigger.writeValue(new Uint8Array([0x00]));
-      }
       if (charStartStop) {
         await charStartStop.writeValue(new Uint8Array([0x00]));
       }
@@ -569,7 +575,7 @@
         await charPower.writeValue(new Uint8Array(10).fill(0));
       }
     } catch (e) {
-      console.warn("Échec ordre de coupure matérielle :", e);
+      console.warn("Échec coupure matérielle :", e);
     }
   }
 </script>
